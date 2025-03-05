@@ -1,76 +1,100 @@
 import numpy as np
-import pandas as pd
-import cv2
+import matplotlib.pyplot as plt
 
-# Load the image matrix from CSV files
-matrix = []
-for n in range(1, 11):
-    file_path = "/Users/peiqiz/DATA/M_" + str(n) + ".csv"
-    img = pd.read_csv(file_path, header=None).values
-    img = img[1:, :].astype(float)  # Assuming first row is headers
-    matrix.append(img.flatten())
-matrix = np.array(matrix)
 
-# Image dimensions
-img_height, img_width = matrix.shape
-dim_X = img_width
-n_samples = img_height
-p = 1000  # Number of basis functions
-noise_std = 100.0  # Noise level
+def support_points_ccp(y, x, n, max_iter=500, tol=1e-6):
+    """
+    Compute support points using the convex-concave procedure (sp.ccp)
+    following the closed-form update rule in Equation (22) of the paper.
 
-# Generate noisy observations
-np.random.seed(42)
-epsilon_img = np.random.normal(1, noise_std, (n_samples, dim_X))
-Y_img = matrix + epsilon_img
+    Parameters:
+      y : numpy array
+          Fixed sample batch drawn from the target distribution F (size N).
+      n : int
+          Desired number of support points.
+      max_iter : int
+          Maximum number of iterations.
+      tol : float
+          Convergence tolerance.
 
-# Define cosine basis function
-def cosine_basis(y, p):
-    return np.array([np.cos(2 * np.pi * j * y / p) for j in range(1, p + 1)])
+    Returns:
+      x : numpy array
+          Final set of n support points.
+    """
+    N = len(y)
+    # # Initialize support points by randomly selecting n distinct points from y
+    # x1 = np.random.choice(y, n, replace=False).astype(float)
+    # x2 = np.random.uniform(0, 0.000000001, n)
+    eps = 1e-8  # small constant to prevent division by zero
 
-# Construct design matrix
-Phi_img = np.array(
-    [cosine_basis(Y_img[i, d], p) for i in range(n_samples) for d in range(dim_X)]
+    for iteration in range(max_iter):
+        x_old = x.copy()
+        new_x = np.zeros_like(x)
+
+        for i in range(n):
+            xi = x[i]
+
+            # Compute contributions from the other support points (exclude index i)
+            x_others = np.delete(x, i)
+            diff_support = np.abs(xi - x_others)
+            # Term from support points: sum_{j != i} (xi - x_j)/|xi - x_j|
+            term_support = np.sum((xi - x_others) / (diff_support + eps))
+            # Denom from support points: sum_{j != i} 1/|xi - x_j|
+            # denom_support = np.sum(1.0 / (diff_support + eps))
+
+            # Compute contributions from the fixed sample batch y
+            diff_y = np.abs(xi - y)
+            term_y = np.sum(y / (diff_y + eps))
+            denom_y = np.sum(1.0 / (diff_y + eps))
+
+            # Combine with weighting factor (N/n) for the support point contributions
+            numerator = (N / n) * term_support + term_y
+            # denominator = (N / n) * denom_support + denom_y
+            denominator = denom_y
+
+            new_x[i] = numerator / (denominator + eps)
+
+        # Check convergence
+        if np.max(np.abs(new_x - x)) < tol:
+            print(f"Converged in {iteration} iterations.")
+            x = new_x
+            break
+        x = new_x
+
+    return x
+
+
+# Main script
+np.random.seed(42)  # For reproducibility
+N = 1000  # Number of samples from standard normal distribution
+n = 100  # Desired number of support points
+
+# Generate 1000 samples from a standard normal distribution
+y_samples = np.random.randn(N)
+# Initialize support points by randomly selecting n distinct points from y
+x1 = np.random.choice(y_samples, n, replace=False).astype(float)
+x2 = np.random.uniform(0, 0.000000001, n)
+
+# Compute support points using the CCP algorithm
+support_pts1 = support_points_ccp(y_samples, x1, n)
+support_pts2 = support_points_ccp(y_samples, x2, n)
+
+# Plot the results: histogram of the 1000 samples and the support points overlaid.
+plt.figure(figsize=(10, 5))
+# plt.hist(y_samples, bins=30, density=True, alpha=0.5, label="Standard Normal Samples")
+# # Plot support points along the x-axis with zero height (for visualization)
+# # plt.scatter(np.sort(support_pts), np.zeros_like(support_pts), color='red', label="Support Points", zorder=5)
+# plt.hist(support_pts1, bins=30, density=True, alpha=0.5, label="Support Points")
+# plt.hist(support_pts2, bins=30, density=True, alpha=0.5, label="Support Points")
+plt.scatter(
+    np.sort(support_pts1),
+    np.sort(support_pts2),
+    color="red",
+    label="Support Points",
+    zorder=5,
 )
-
-# Solve for theta_hat using the normal equation
-Phi_T_img = Phi_img.T
-theta_hat_img = np.linalg.inv(Phi_T_img @ Phi_img) @ Phi_T_img @ epsilon_img.flatten()
-
-# Predict and reconstruct
-epsilon_hat_img = (Phi_img @ theta_hat_img).reshape(n_samples, dim_X)
-X_hat_img = Y_img - epsilon_hat_img
-
-# For demonstration, select the first image and reshape (assuming 28x28 images)
-img_shape = (28, 28)
-orig_img = matrix[0, :].reshape(img_shape)
-noisy_img = Y_img[0, :].reshape(img_shape)
-recon_img = X_hat_img[0, :].reshape(img_shape)
-
-# Normalize images to the 0-255 range and convert to uint8
-def normalize_to_uint8(img):
-    img = np.clip(img, 0, 255)
-    return img.astype(np.uint8)
-
-orig_img = normalize_to_uint8(orig_img)
-noisy_img = normalize_to_uint8(noisy_img)
-recon_img = normalize_to_uint8(recon_img)
-
-# Resize images for better viewing (e.g., scaling up by a factor of 10)
-scale_factor = 10
-new_size = (img_shape[1] * scale_factor, img_shape[0] * scale_factor)
-orig_img_large = cv2.resize(orig_img, new_size, interpolation=cv2.INTER_NEAREST)
-noisy_img_large = cv2.resize(noisy_img, new_size, interpolation=cv2.INTER_NEAREST)
-recon_img_large = cv2.resize(recon_img, new_size, interpolation=cv2.INTER_NEAREST)
-
-# Add labels to each image
-cv2.putText(orig_img_large, "Original", (10, 25), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255), 2)
-cv2.putText(noisy_img_large, "Noisy", (10, 25), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255), 2)
-cv2.putText(recon_img_large, "Reconstructed", (10, 25), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255), 2)
-
-# Display the images in separate windows
-cv2.imshow("Original Image", orig_img_large)
-cv2.imshow("Noisy Image", noisy_img_large)
-cv2.imshow("Reconstructed Image", recon_img_large)
-
-cv2.waitKey(0)
-cv2.destroyAllWindows()
+plt.title("Support Points via CCP")
+plt.xlabel("Value")
+plt.ylabel("Density")
+plt.legend()
+plt.show()
