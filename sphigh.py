@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import tensorflow as tf
 from tensorflow.keras.datasets import mnist
 
 def support_points_ccp(y, x, n, max_iter=500, tol=1e-4):
@@ -90,7 +91,6 @@ def plot_support_points(support_points, title):
     for i, ax in enumerate(axes.flat):
         ax.imshow(support_points[i].reshape(28, 28), cmap='gray')
         ax.axis('off')
-    plt.suptitle(title)
     plt.show()
 
 # plot_support_points(support_pts1, "Support Points from x1 Initialization")
