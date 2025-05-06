@@ -8,7 +8,7 @@ from tensorflow.keras.datasets import mnist
 
 # Load MNIST data
 (X_train, y_train), (_, _) = mnist.load_data()
-X_train = X_train[y_train == 9]
+# X_train = X_train[y_train == 9]
 # X_train = X_train[(y_train == 9) | (y_train == 6)]
 
 # Normalize data to [-1, 1]
@@ -134,5 +134,5 @@ def generate_and_plot(generator, latent_dim, num_images=100, title="Generated Im
 
 # Generate and visualize images using the new plotting function
 generate_and_plot(
-    generator, latent_dim, num_images=100, title="GANs: Generated MNIST Digit 6_9s"
+    generator, latent_dim, num_images=100, title="GANs: Generated MNIST Digit"
 )
