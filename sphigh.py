@@ -28,7 +28,7 @@ def support_points_ccp(y, x, n, max_iter=500, tol=1e-4):
     N = y.shape[0]
     eps = 1e-8  # small constant to prevent division by zero
 
-    V = np.random.exponential(scale=1.0, size=N)
+    V = np.random.exponential(scale=10e-4, size=N)
     weights = V / np.sum(V)
     # weights *= N
 
@@ -71,16 +71,16 @@ def support_points_ccp(y, x, n, max_iter=500, tol=1e-4):
 
 # Load the MNIST dataset
 (x_train, y_train), (_, _) = mnist.load_data()
-x_train_9 = x_train[y_train == 9]
-y_train_9 = y_train[y_train == 9]
-# # Normalize images to [0, 1]
-# x_train = x_train.astype('float32') / 255.0
+x_train_9 = x_train
+y_train_9 = y_train
+# Normalize images to [0, 1]
+x_train_9 = x_train_9.astype('float32') / 255.0
 # Flatten each image from 28x28 to 784 dimensions
 x_train_9 = x_train_9.reshape(-1, 28 * 28)
 
 N = x_train_9.shape[0]  # number of MNIST images
 # print(x_train_9.shape)
-n = 4  # desired number of support points
+n = 100  # desired number of support points
 
 # Two initializations for support points:
 # Initialization 1: Randomly select n images from the dataset.
@@ -93,8 +93,12 @@ x2 = np.random.uniform(0, 0.01, size=(n, 28 * 28))
 # Compute support points using the modified CCP algorithm
 # support_pts1 = support_points_ccp(x_train_9, x1, n)
 support_pts2 = support_points_ccp(x_train_9, x2, n)
+mn, mx = support_pts2.min(), support_pts2.max()
+support_pts2_rescaled = (support_pts2 - mn) / (mx - mn)
+print(support_pts2_rescaled.max(), support_pts2_rescaled.min())
+support_pts2_bin = (support_pts2_rescaled >= 0.5).astype('float32')
 
-
+# print(support_pts2[:10,])
 # Visualization: plot support points as 28x28 images in a grid.
 def plot_support_points(support_points, title):
     grid_size = int(np.sqrt(len(support_points)))
@@ -107,8 +111,8 @@ def plot_support_points(support_points, title):
 
 
 # plot_support_points(support_pts1, "Support Points from x1 Initialization")
-plot_support_points(support_pts2, "Support Points from x2 Initialization")
-
+# plot_support_points(support_pts2, "Support Points from x2 Initialization")
+plot_support_points(support_pts2_bin, "Crisp Support Points")
 
 # # Load the MNIST dataset (raw pixel values in the range [0, 255])
 # (x_train, y_train), (x_test, y_test) = mnist.load_data()
